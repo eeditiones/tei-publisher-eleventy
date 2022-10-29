@@ -1,20 +1,32 @@
-// Example use for the demo plugin:
-// {{ 'Steph' | hello | safe }}
+const UserConfig = require("@11ty/eleventy/src/UserConfig");
+const { TpPlugin } = require("./teipublisher");
 
-module.exports = (eleventyConfig, options) => {
-  // Define defaults for your plugin config
+/** @param {UserConfig} eleventyConfig */
+module.exports = (eleventyConfig, userOptions) => {
   const defaults = {
-    htmlTag: "h2",
+      remote: 'http://localhost:8080/exist/apps/tei-publisher/'
   };
+  
+  const options = {...defaults, ...userOptions};
+  const pluginInstance = new TpPlugin(options);
 
-  // You can create more than filters as a plugin, but here's an example
-  eleventyConfig.addFilter("hello", (name) => {
-    // Combine defaults with user defined options
-    const { htmlTag } = {
-      ...defaults,
-      ...options,
-    };
-
-    return `<${htmlTag}>Hello, ${name}!</${htmlTag}>`;
+  eleventyConfig.addTransform('transform-tp-components', function(content, deprecatedOutputPath) {
+      const outputPath = deprecatedOutputPath || this.outputPath;
+      const context = {
+          outputPath,
+          inputPath: this.inputPath,
+          baseDir: eleventyConfig.dir ? eleventyConfig.dir.output : '_foo'
+      };
+      return pluginInstance.transform(content, context);
   });
+
+  eleventyConfig.addAsyncShortcode('tpfetch', (url) => {
+    return pluginInstance.fetch(url);
+  });
+
+  return {
+    dir: {
+      output: "_site"
+    }
+  }
 };
