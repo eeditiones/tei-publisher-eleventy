@@ -4,6 +4,8 @@ title: TEI Publisher Integration Test
 doc: doc/documentation.xml
 odd: docbook
 context:
+eleventyComputed:
+  toc: api/document/{{doc | urlencode}}/contents?target=transcription&icons=false
 ---
 <pb-page api-version="1.0.0" unresolved="unresolved">
 <main>
@@ -29,7 +31,7 @@ context:
           </li>
       </ul>
       <nav>
-        {% tpfetch "api/document/" + doc | urlencode + "/contents?target=transcription&icons=false" %}
+        {% tpfetch toc %}
       </nav>
       <pb-view id="view1" src="document1" append-footnotes="append-footnotes" subscribe="transcription" emit="transcription" 
           static="{{context}}">
