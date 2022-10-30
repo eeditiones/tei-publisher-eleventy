@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{metadata.title}}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-iYQeCzEYFbKjA/T2uDLTpkwGzCiq6soy8tYaI1GyVh/UjpbCx/TYkiZhlZB6+fzT" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.9.1/font/bootstrap-icons.css">
+  <style type="text/css">
+    pb-page {
+      max-width: 1200px;
+      margin-left: auto;
+      margin-right: auto;
+      margin-top: 1rem;
+    }
+    main {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      column-gap: 20px;
+    }
+    </style>
+</head>
+<body>
+  <pb-page api-version="1.0.0" unresolved="unresolved">
+    <nav class="navbar navbar-expand-lg bg-light">
+      <div class="container-fluid">
+        <a class="navbar-brand" href="/">{{metadata.title}}</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+          <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+            <li class="nav-item">
+              <a class="nav-link active" aria-current="page" href="/">Home</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="documentation/">Documentation</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+    <h2 class="display-2">{{ title }}</h2>
+    <main>
+      {{ content | safe }}
+    </main>
+  </pb-page>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.1/dist/js/bootstrap.bundle.min.js" integrity="sha384-u1OknCvxWvY5kfmNBILK2hRnQC3Pr17a+RTT6rIHI7NnikvbZlHgTPOOmMi466C8" crossorigin="anonymous"></script>
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@teipublisher/pb-components@latest/dist/pb-components-bundle.js"></script>
+</body>
+</html>

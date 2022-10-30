@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "An eleventy plugin to embed a static copy of TEI files transformed via TEI Publisher",
   "homepage": "",
-  "main": ".eleventy.js",
+  "main": "index.js",
   "scripts": {
     "start": "eleventy --serve",
     "build": "eleventy",

@@ -13,7 +13,7 @@ class TpPlugin {
      */
     constructor(config) {
         this.config = config;
-
+        console.log('Limit %d', config.limit);
         this.client = axios.create({
             baseURL: this.config.remote
         });
@@ -86,7 +86,10 @@ class TpPlugin {
                 do {
                     next = await this._retrieve(component, url, params, context, mapping, next, counter);
                     counter += 1;
-                } while(next && counter <= 10);
+                    if (this.config.limit && counter > this.config.limit) {
+                        break;
+                    }
+                } while(next);
                 
             }
 
