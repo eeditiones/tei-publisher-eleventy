@@ -1,3 +1,4 @@
 demo
 _site
+.cache
 .eleventy.js

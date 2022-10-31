@@ -5,8 +5,9 @@
   "homepage": "",
   "main": "index.js",
   "scripts": {
-    "start": "eleventy --serve",
-    "build": "eleventy",
+    "start": "DEBUG=tei-publisher eleventy --serve",
+    "build": "DEBUG=tei-publisher eleventy",
+    "build.all": "TP_NO_CACHE=true DEBUG=tei-publisher eleventy",
     "bump": "npm --no-git-tag-version version"
   },
   "repository": {
@@ -28,11 +29,14 @@
     "url": "https://github.com/eeditiones/tei-publisher-eleventy/issues"
   },
   "devDependencies": {
-    "@11ty/eleventy": "^1.0.2"
+    "@11ty/eleventy": "^1.0.2",
+    "@types/axios": "^0.14.0"
   },
   "dependencies": {
+    "@11ty/eleventy-fetch": "^3.0.0",
     "axios": "^1.1.3",
     "jsdom": "^20.0.1",
+    "luxon": "^3.0.4",
     "mkdirs": "^1.0.0"
   }
 }

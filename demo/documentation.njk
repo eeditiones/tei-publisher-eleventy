@@ -1,0 +1,55 @@
+---
+layout: base.njk
+pagination:
+    data: teidocuments.documentation
+    size: 1
+    alias: doc
+    filter:
+        - about.md
+permalink: "{{ doc.path }}/"
+eleventyComputed:
+    toc: api/document/{{doc.path | urlencode}}/contents?target=transcription&icons=false
+---
+
+<pb-document id="document1" path="{{doc.path}}" odd="{{doc.odd}}"></pb-document>
+
+<div class="row mt-2">
+    <div class="col offcanvas-lg offcanvas-start" tabindex="-1" id="toc-panel" aria-labelledby="offcanvasExampleLabel">
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="offcanvasExampleLabel">Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#toc-panel" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body toc">
+            {% tpfetch toc %}
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="row">
+            <ul class="nav justify-content-start align-items-center gap-2">
+                <li class="nav-item">
+                    <button class="btn btn-light" data-bs-toggle="offcanvas" data-bs-target="#toc-panel"><i class="bi bi-list-columns-reverse"></i></button>
+                </li>
+                <li class="nav-item">
+                    <pb-navigation emit="transcription" keyboard="left"
+                        subscribe="transcription" direction="backward" unit="page" class="btn btn-light">
+                        <i class="bi bi-arrow-left"></i>
+                    </pb-navigation>
+                </li>
+                <li class="nav-item">
+                    <pb-navigation emit="transcription" keyboard="right"
+                        subscribe="transcription" direction="forward" unit="page" class="btn btn-light">
+                        <i class="bi bi-arrow-right"></i>
+                    </pb-navigation>
+                </li>
+                <li class="nav-item flex-grow-2 ps-3">
+                    <pb-view id="breadcrumbs" class="breadcrumbs" src="document1" subscribe="transcription" static="{{context}}" view="div">
+                        <pb-param name="mode" value="breadcrumbs"></pb-param>
+                    </pb-view>
+                </li>
+            </ul>
+        </div>
+        <pb-view id="view1" src="document1" append-footnotes="append-footnotes" subscribe="transcription" emit="transcription" view="{{doc.view}}"
+            static="{{context}}" class="row">
+        </pb-view>
+    </div>
+</div>

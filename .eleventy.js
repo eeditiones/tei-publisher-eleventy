@@ -3,8 +3,10 @@ const tpPlugin = require("./index");
 
 /** @param {UserConfig} eleventyConfig */
 module.exports = (eleventyConfig) => {
+  eleventyConfig.addPassthroughCopy('demo/css/*.css');
   eleventyConfig.addPlugin(tpPlugin, {
-    limit: 10
+    remote: 'http://localhost:8080/exist/apps/tei-publisher/',
+    collections: true
   });
 
   return {

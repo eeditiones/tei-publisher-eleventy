@@ -1,0 +1,59 @@
+---
+layout: base.njk
+pagination:
+    data: teidocuments.dta
+    size: 1
+    alias: doc
+    filter:
+        - about.md
+permalink: "{{ doc.path }}/"
+eleventyComputed:
+    toc: api/document/{{doc.path | urlencode}}/contents?target=transcription&icons=false
+---
+
+<pb-document id="document1" path="{{doc.path}}" odd="{{doc.odd}}"></pb-document>
+
+<div class="offcanvas offcanvas-start" tabindex="-1" id="toc-panel" aria-labelledby="offcanvasExampleLabel">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="offcanvasExampleLabel">Contents</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body toc">
+    {% tpfetch toc %}
+  </div>
+</div>
+<div class="row fixed-height">
+    <div class="col">
+        <ul class="nav justify-content-start align-items-center gx-2 flex-nowrap">
+            <li class="nav-item">
+                <button class="btn btn-light" data-bs-toggle="offcanvas" data-bs-target="#toc-panel"><i class="bi bi-list-columns-reverse"></i></button>
+            </li>
+            <li class="nav-item">
+                <pb-navigation emit="transcription" keyboard="left"
+                    subscribe="transcription" direction="backward" unit="page" class="btn btn-light">
+                    <i class="bi bi-arrow-left"></i>
+                </pb-navigation>
+            </li>
+            <li class="nav-item">
+                <pb-navigation emit="transcription" keyboard="right"
+                    subscribe="transcription" direction="forward" unit="page" class="btn btn-light">
+                    <i class="bi bi-arrow-right"></i>
+                </pb-navigation>
+            </li>
+            <li class="nav-item">
+                <pb-view id="title-view1" src="document1" xpath="//teiHeader/fileDesc/titleStmt/title[@type='main']" view="single" static="{{context}}">
+                    <pb-param name="header" value="short"></pb-param>
+                </pb-view>
+            </li>
+        </ul>
+        <pb-view id="view1" src="document1" append-footnotes="append-footnotes" subscribe="transcription" emit="transcription" view="{{doc.view}}"
+            static="{{context}}" class="fixed-content" wait-for="#facsimile">
+        </pb-view>
+    </div>
+    <pb-facsimile class="col" id="facsimile" base-uri="https://media.dwds.de/dta/images/"
+        type="image"
+        default-zoom-level="0" show-navigation-control="show-navigation-control"
+        show-navigator="show-navigator"
+        subscribe="transcription">
+    </pb-facsimile>
+</div>
