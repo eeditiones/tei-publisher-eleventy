@@ -1,5 +1,5 @@
 const UserConfig = require("@11ty/eleventy/src/UserConfig");
-const { TpPlugin } = require("./teipublisher");
+const { TpPlugin } = require("./plugin");
 
 /** @param {UserConfig} eleventyConfig */
 module.exports = (eleventyConfig, userOptions) => {

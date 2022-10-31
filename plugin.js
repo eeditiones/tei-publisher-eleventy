@@ -70,10 +70,9 @@ class TpPlugin {
      * @returns 
      */
     async transform(content, context) {
-        const dom = new JSDOM(content);
-        const { document } = dom.window;
+        const dom = JSDOM.fragment(content);
 
-        const views = [...document.querySelectorAll('pb-view')];
+        const views = [...dom.querySelectorAll('pb-view')];
         if (views.length > 0) {
             debug('Found %s views in page %s', chalk.blue(views.length), context.outputPath);
 
@@ -97,7 +96,7 @@ class TpPlugin {
                     continue;
                 }
 
-                const doc = document.getElementById(srcDoc);
+                const doc = dom.getElementById(srcDoc);
                 docPath = doc.getAttribute('path');
                 const meta = await this._loadMeta(docPath);
 
@@ -129,27 +128,30 @@ class TpPlugin {
 
                 this._checkCSS(params, context);
 
-                const url = `api/parts/${encodeURIComponent(docPath)}/json`;
                 log('Retrieving %s for %s', chalk.blue(component), chalk.magenta(docPath));
 
                 let next = null;
                 let counter = 1;
+                const images = [];
                 do {
-                    next = await this._retrieve(component, url, params, context, mapping, next, counter);
+                    next = await this._retrieve(component, docPath, params, context, mapping, next, counter, images);
                     counter += 1;
                     if (this.config.limit && counter > this.config.limit) {
                         break;
                     }
                 } while(next);
                 
+                await this._loadImages(images, context.outputDir, `${this.config.remote}${docPath}`)
             }
 
             fs.writeFileSync(mapFile, JSON.stringify(mapping, null, 4));
+
         }
         return content; // no change done.
     }
 
-    async _retrieve(name, url, params, context, mapping, root = null, counter = 1) {
+    async _retrieve(name, docPath, params, context, mapping, root = null, counter = 1, images) {
+        const url = `api/parts/${encodeURIComponent(docPath)}/json`;
         if (root) {
             params = {...params, ...root};
         }
@@ -164,21 +166,28 @@ class TpPlugin {
         });
 
         if (response && response.status === 200) {
+            
             const outName = `${name}-${counter}.json`;
             const outFile = path.resolve(context.outputDir, outName);
             fs.writeFileSync(outFile, JSON.stringify(response.data, null, 4));
-
+            
             mapping[computeKey(params)] = outName;
             if (response.data.id) {
                 const paramsWithId = {...params, ...{id: response.data.id}};
                 delete paramsWithId.root;
                 mapping[computeKey(paramsWithId)] = outName;
             }
+            await this._expandPageContent(response.data.content, images, context.outputDir, `${this.config.remote}/${docPath}`);
             if (response.data.next) {
                 return { root: response.data.next };
             }
         }
         return null;
+    }
+
+    async _expandPageContent(content, images, outputDir, baseURI) {
+        const dom = JSDOM.fragment(content);
+        dom.querySelectorAll('img[src]').forEach((img) => images.push(img.src));
     }
 
     async _loadMeta(path) {
@@ -284,7 +293,7 @@ class TpPlugin {
         const outputFile = path.resolve(dir, `${start}.html`);
         fs.writeFileSync(outputFile, response.data);
         
-        const subcols = this._expandCollectionContent(response.data, docList, rootDir);
+        const subcols = await this._expandCollectionContent(response.data, docList, rootDir);
         const total = response.headers['pb-total'];
         if (total && start + 10 < total) {
             await this._fetchCollection(collection, start + 10, rootDir, dir, docList);
@@ -301,14 +310,14 @@ class TpPlugin {
         }
     }
 
-    _expandCollectionContent(content, docList, outputDir) {
-        const dom = new JSDOM(content);
-        const { document } = dom.window;
+    async _expandCollectionContent(content, docList, outputDir) {
+        const dom = JSDOM.fragment(content);
         const subcols = [];
-        this._loadImages(document.querySelectorAll('img[src]'), outputDir);
-        document.querySelectorAll('.document a[data-collection]')
+        const images = Array.from(dom.querySelectorAll('img[src]'), (elem) => elem.src);
+        await this._loadImages(images, outputDir, this.config.remote);
+        dom.querySelectorAll('.document a[data-collection]')
             .forEach(link => subcols.push(link.getAttribute('data-collection')));
-        document.querySelectorAll('.document a:not([data-collection])')
+        dom.querySelectorAll('.document a:not([data-collection])')
             .forEach(link => {
                 if (link.href) {
                     if (/\.md$/.test(link.href)) {
@@ -323,23 +332,25 @@ class TpPlugin {
         return subcols;
     }
 
-    _loadImages(images, outputDir) {
-        for (const image of images) {
-            const url = new URL(image.src, this.config.remote);
+    async _loadImages(images, outputDir, baseURI) {
+        for (let i = 0; i < images.length; i++) {
+            const url = new URL(images[i], baseURI);
             if (url.toString().startsWith(this.config.remote)) {
-                debug('Loading image: %s', image.src);
-                this.client.request({
+                debug('Loading image: %s', url);
+                const response = await this.client.request({
                     url,
                     method: 'get',
                     responseType: 'arraybuffer'
                 })
                 .catch(function (error) {
                     console.error('Failed to load image data from %s', url);
-                })
-                .then((response) => {
-                    const outputFile = path.join(outputDir, image.src);
-                    fs.writeFileSync(outputFile, response.data);
                 });
+                if (response && response.status === 200) {
+                    const outputFile = path.join(outputDir, images[i]);
+                    const imageDir = path.dirname(outputFile);
+                    mkdirp.sync(imageDir);
+                    fs.writeFileSync(outputFile, response.data);
+                }
             }
         }
     }
