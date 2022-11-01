@@ -113,3 +113,7 @@
     font-size: 16px;
     margin: 0;
 }
+
+.documentation aside, .documentation > div {
+    height: calc(100vh - 56px - 0.5rem);
+}

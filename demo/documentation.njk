@@ -13,8 +13,8 @@ eleventyComputed:
 
 <pb-document id="document1" path="{{doc.path}}" odd="{{doc.odd}}"></pb-document>
 
-<div class="row mt-2">
-    <div class="col offcanvas-lg offcanvas-start" tabindex="-1" id="toc-panel" aria-labelledby="offcanvasExampleLabel">
+<div class="documentation row mt-2">
+    <aside class="col offcanvas-lg offcanvas-start overflow-auto" tabindex="-1" id="toc-panel" aria-labelledby="offcanvasExampleLabel">
         <div class="offcanvas-header">
             <h5 class="offcanvas-title" id="offcanvasExampleLabel">Contents</h5>
             <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#toc-panel" aria-label="Close"></button>
@@ -22,8 +22,8 @@ eleventyComputed:
         <div class="offcanvas-body toc">
             {% tpfetch toc %}
         </div>
-    </div>
-    <div class="col-lg-8">
+    </aside>
+    <div class="col-lg-8 d-flex flex-column">
         <div class="row">
             <ul class="nav justify-content-start align-items-center flex-nowrap gap-2">
                 <li class="nav-item">
@@ -49,7 +49,7 @@ eleventyComputed:
             </ul>
         </div>
         <pb-view id="view1" src="document1" append-footnotes="append-footnotes" subscribe="transcription" emit="transcription" view="{{doc.view}}"
-            static="{{context}}" class="row">
+            static="{{context}}" class="row flex-grow-1 overflow-auto">
         </pb-view>
     </div>
 </div>
