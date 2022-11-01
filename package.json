@@ -15,13 +15,12 @@
     "url": "git+https://github.com/eeditiones/tei-publisher-eleventy.git"
   },
   "keywords": [
-    "11ty",
-    "11ty-plugin",
-    "eleventy",
-    "eleventy-plugin"
+    "TEI Publisher",
+    "TEI",
+    "XML"
   ],
   "author": {
-    "name": "Wolfgang Meier",
+    "name": "e-editiones.org",
     "url": "https://e-editiones.org"
   },
   "license": "GPL-3.0-or-later",
