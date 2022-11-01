@@ -1,6 +1,6 @@
 {
   "name": "@teipublisher/pb-eleventy-plugin",
-  "version": "1.0.0",
+  "version": "0.9.0",
   "description": "An eleventy plugin to embed a static copy of TEI files transformed via TEI Publisher",
   "homepage": "",
   "main": "index.js",
