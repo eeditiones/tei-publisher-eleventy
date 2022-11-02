@@ -33,7 +33,7 @@ module.exports = (eleventyConfig, userOptions) => {
     });
   }
 
-  eleventyConfig.addAsyncShortcode('tpfetch', (url) => {
+  eleventyConfig.addAsyncShortcode('tpfetch', async (url) => {
     if (options.disabled) {
       return '';
     }
