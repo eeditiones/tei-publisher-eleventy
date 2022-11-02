@@ -4,6 +4,8 @@ const { TpPlugin } = require("./plugin");
 /** @param {UserConfig} eleventyConfig */
 module.exports = (eleventyConfig, userOptions) => {
   const defaults = {
+      /* Add option to disable the plugin */
+      disabled: false,
       /* Base URL of the app to retrieve data from */
       remote: 'http://localhost:8080/exist/apps/tei-publisher/',
       /* For debugging: limit number of pages retrieved per document or null for unlimited */
@@ -15,6 +17,11 @@ module.exports = (eleventyConfig, userOptions) => {
   };
   
   const options = {...defaults, ...userOptions};
+
+  if (options.disabled) {
+    return;
+  }
+
   eleventyConfig.addGlobalData('tp-config', options);
 
   const pluginInstance = new TpPlugin(options);
