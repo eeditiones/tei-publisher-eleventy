@@ -18,29 +18,34 @@ module.exports = (eleventyConfig, userOptions) => {
   
   const options = {...defaults, ...userOptions};
 
-  if (options.disabled) {
-    return;
+  if (!options.disabled) {
+
+    eleventyConfig.addGlobalData('tp-config', options);
+
+    const pluginInstance = new TpPlugin(options);
+
+    eleventyConfig.addTransform('transform-tp-components', function(content, deprecatedOutputPath) {
+        const outputPath = deprecatedOutputPath || this.outputPath;
+        const context = {
+            outputPath,
+            inputPath: this.inputPath,
+            baseDir: eleventyConfig.dir ? eleventyConfig.dir.output : '_site'
+        };
+        return pluginInstance.transform(content, context);
+    });
   }
 
-  eleventyConfig.addGlobalData('tp-config', options);
-
-  const pluginInstance = new TpPlugin(options);
-
-  eleventyConfig.addTransform('transform-tp-components', function(content, deprecatedOutputPath) {
-      const outputPath = deprecatedOutputPath || this.outputPath;
-      const context = {
-          outputPath,
-          inputPath: this.inputPath,
-          baseDir: eleventyConfig.dir ? eleventyConfig.dir.output : '_site'
-      };
-      return pluginInstance.transform(content, context);
-  });
-
   eleventyConfig.addAsyncShortcode('tpfetch', (url) => {
+    if (options.disabled) {
+      return '';
+    }
     return pluginInstance.fetch(url);
   });
 
   eleventyConfig.addGlobalData('teidocuments', async function() {
+    if (options.disabled) {
+      return [];
+    }
     return await pluginInstance.fetchCollections(eleventyConfig.dir ? eleventyConfig.dir.output : '_site');
   });
 };
