@@ -39,9 +39,17 @@ module.exports = function(eleventyConfig) {
     /* Browse collection contents */
     collections: false,
     /* Use caching for document lists and resources fetched via tpfetch */
-    useCache: false,
+    useCache: process.env['TP_NO_CACHE'] !== 'true',
     /* For debugging: limit number of pages retrieved per document or null for unlimited */
     limit: null,
+    /* Limit the number of concurrent requests sent to the server */
+    concurrency: 2,
+    /**
+     * Use this to add entries to the `tpdata` global data object. Data will be retrieved from the URL
+     * given as property value. It must return JSON. The result will be stored to the global data object under 
+     * the properties name.
+     */
+    data: {}
   });
 };
 ```
@@ -52,6 +60,13 @@ Known options are:
 * `collections <boolean>`: if set to true, the plugin will scan the document collections provided by the TEI Publisher instance and save the collection listings. It also adds all documents found to a global data object (`teidocuments`), which can be used later to automatically output a page for each document.
 * `useCache <boolean>`: the plugin can cache some resources which would otherwise take a longer time to retrieve, e.g. the global list of documents
 * `limit <number>`: for testing: only retrieve the first X pages for each document. This will speed up the build time.
+* `concurrency <number>`: limits the number of concurrent requests sent to the server.
+* `data <object>`: downloads JSON data from the server and adds it to the global data object named `tpdata`. Data will be loaded from the URL given as value of each property. It should be in JSON format. The result will be stored to the global data object under the properties' name. For example, the following `data` definition will retrieve JSON data from `api/people` and you can later use it in templates via the variable `tpdata.people`:
+  ```javascript
+  data: {
+    "people": "api/people"
+  }
+  ```
 
 ### Writing templates
 

@@ -27,6 +27,10 @@ class TpPlugin {
         this.client = axios.create({
             baseURL: this.config.remote
         });
+        this.queue = null;
+        import('p-queue').then(({ default: PQueue }) => {
+            this.queue = new PQueue.default({concurrency: this.config.concurrency, autoStart: true});
+        });
     }
 
     /**
@@ -52,15 +56,20 @@ class TpPlugin {
             responseType: 'text'
         })
         .catch(function (error) {
-            warn(error.toJSON());
-            return null;
-            // throw Error(error.code);
+            const err = error.toJSON();
+            debug('Failed to fetch %s: %s', chalk.bgRed(err.config.url), err.message);
         });
-
+        if (!response) {
+            return `Failed to fetch ${url}`;
+        }
         if (asset) {
             await asset.save(response.data, 'text');
         }
         return response.data;
+    }
+
+    async addTransform(content, context) {
+        return this.queue.add(() => this.transform(content, context));
     }
 
     /**
@@ -99,7 +108,9 @@ class TpPlugin {
                 const doc = dom.getElementById(srcDoc);
                 docPath = doc.getAttribute('path');
                 const meta = await this._loadMeta(docPath);
-
+                if (!meta) {
+                    throw new Error(`Failed to load metadata for ${docPath}`);
+                }
                 const lastModified = DateTime.fromISO(meta.lastModified);
                 const firstPageData = path.join(context.outputDir, `${component}-1.json`);
                 if (fs.existsSync(firstPageData)) {
@@ -161,14 +172,16 @@ class TpPlugin {
             params
         })
         .catch(function (error) {
-            console.error(error.toJSON());
-            return null;
+            const err = error.toJSON();
+            debug('Failed to retrieve fragment %s: %s', chalk.bgRed(err.config.url), err.message);
         });
 
         if (response && response.status === 200) {
             
             const outName = `${name}-${counter}.json`;
             const outFile = path.resolve(context.outputDir, outName);
+            const transformed = await this._expandPageContent(response.data.content, images, context.outputDir, `${this.config.remote}/${docPath}`);
+            response.data.content = transformed;
             fs.writeFileSync(outFile, JSON.stringify(response.data, null, 4));
             
             mapping[computeKey(params)] = outName;
@@ -177,7 +190,6 @@ class TpPlugin {
                 delete paramsWithId.root;
                 mapping[computeKey(paramsWithId)] = outName;
             }
-            await this._expandPageContent(response.data.content, images, context.outputDir, `${this.config.remote}/${docPath}`);
             if (response.data.next) {
                 return { root: response.data.next };
             }
@@ -186,8 +198,15 @@ class TpPlugin {
     }
 
     async _expandPageContent(content, images, outputDir, baseURI) {
-        const dom = JSDOM.fragment(content);
-        dom.querySelectorAll('img[src]').forEach((img) => images.push(img.src));
+        const dom = new JSDOM(content);
+        dom.window.document.querySelectorAll('img[src]').forEach((img) => images.push(img.src));
+        dom.window.document.querySelectorAll('a[href]').forEach((link) => {
+            const url = new URL(link.href, baseURI);
+            if (url.toString().startsWith(this.config.remote)) {
+                link.setAttribute('href', `/${link.getAttribute('href')}`);
+            }
+        });
+        return dom.serialize();
     }
 
     async _loadMeta(path) {
@@ -197,10 +216,12 @@ class TpPlugin {
                 method: 'get'
             })
             .catch(function (error) {
-                console.error(error.toJSON());
-                return null;
-                // throw Error(error.code);
+                const err = error.toJSON();
+                debug('Failed to load metadata from %s: %s', chalk.bgRed(err.config.url), err.message);
             });
+            if (!response) {
+                return null;
+            }
             return response.data;
         } catch(e) {
             return null;
@@ -226,9 +247,8 @@ class TpPlugin {
                     fs.writeFileSync(outFile, response.data);
                 })
                 .catch(function (error) {
-                    console.error('Failed to load CSS from %s', url);
-                    console.error(error.response.data);
-                    // throw Error(error.code);
+                    const err = error.toJSON();
+                    debug('Failed to load CSS from %s: %s', chalk.bgRed(err.config.url), err.message);
                 });
             }
         }
@@ -287,9 +307,12 @@ class TpPlugin {
             params: { start }
         })
         .catch(function (error) {
-            warn('Failed to load collection from %s', url);
-            return;
+            const err = error.toJSON();
+            debug('Failed to load collection %s from %s: %s', chalk.bgRed(collection), err.config.url, err.message);
         });
+        if (!response) {
+            return;
+        }
         const outputFile = path.resolve(dir, `${start}.html`);
         fs.writeFileSync(outputFile, response.data);
         
@@ -343,7 +366,8 @@ class TpPlugin {
                     responseType: 'arraybuffer'
                 })
                 .catch(function (error) {
-                    console.error('Failed to load image data from %s', url);
+                    const err = error.toJSON();
+                    debug('Failed to load image data from %s: %s', chalk.bgRed(err.config.url), err.message);
                 });
                 if (response && response.status === 200) {
                     const outputFile = path.join(outputDir, images[i]);

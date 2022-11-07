@@ -13,16 +13,22 @@ module.exports = (eleventyConfig, userOptions) => {
       /* Browse collection contents */
       collections: false,
       /* Use caching for document lists and resources fetched via tpfetch */
-      useCache: process.env['TP_NO_CACHE'] !== 'true'
+      useCache: process.env['TP_NO_CACHE'] !== 'true',
+      /* Limit the number of concurrent requests sent to the server */
+      concurrency: 2,
+      /**
+       * Use this to add entries to the `tpdata` global data object. Data will be retrieved from the URL
+       * given as property value. It must return JSON. The result will be stored to the global data object under 
+       * the properties name.
+       */
+      data: {}
   };
   
   const options = {...defaults, ...userOptions};
 
+  const pluginInstance = new TpPlugin(options);
+  eleventyConfig.addGlobalData('tpConfig', options);
   if (!options.disabled) {
-
-    eleventyConfig.addGlobalData('tp-config', options);
-
-    const pluginInstance = new TpPlugin(options);
 
     eleventyConfig.addTransform('transform-tp-components', function(content, deprecatedOutputPath) {
         const outputPath = deprecatedOutputPath || this.outputPath;
@@ -31,7 +37,7 @@ module.exports = (eleventyConfig, userOptions) => {
             inputPath: this.inputPath,
             baseDir: eleventyConfig.dir ? eleventyConfig.dir.output : '_site'
         };
-        return pluginInstance.transform(content, context);
+        return pluginInstance.addTransform(content, context);
     });
   }
 
@@ -47,5 +53,14 @@ module.exports = (eleventyConfig, userOptions) => {
       return [];
     }
     return await pluginInstance.fetchCollections(eleventyConfig.dir ? eleventyConfig.dir.output : '_site');
+  });
+
+  eleventyConfig.addGlobalData('tpdata', async function() {
+    const data = {};
+    for (let entry of Object.entries(options.data)) {
+      const fetched = await pluginInstance.fetch(entry[1]);
+      data[entry[0]] = JSON.parse(fetched);
+    }
+    return data;
   });
 };
