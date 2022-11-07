@@ -48,7 +48,7 @@ module.exports = (eleventyConfig, userOptions) => {
     return pluginInstance.fetch(url);
   });
 
-  eleventyConfig.addGlobalData('teidocuments', async function() {
+  eleventyConfig.addGlobalData('tpdocuments', async function() {
     if (options.disabled) {
       return {};
     }
