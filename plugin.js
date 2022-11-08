@@ -180,16 +180,21 @@ class TpPlugin {
             
             const outName = `${name}-${counter}.json`;
             const outFile = path.resolve(context.outputDir, outName);
-            const transformed = await this._expandPageContent(response.data.content, images, context.outputDir, `${this.config.remote}/${docPath}`);
+            const { transformed, ids } = 
+                await this._expandPageContent(
+                    response.data.content, 
+                    images, 
+                    `${this.config.remote}/${docPath}`
+                );
             response.data.content = transformed;
             fs.writeFileSync(outFile, JSON.stringify(response.data, null, 4));
             
             mapping[computeKey(params)] = outName;
             if (response.data.id) {
-                const paramsWithId = {...params, ...{id: response.data.id}};
-                delete paramsWithId.root;
-                mapping[computeKey(paramsWithId)] = outName;
+                ids.push(response.data.id);
             }
+            this._addById(mapping, outName, params, ids);
+            
             if (response.data.next) {
                 return { root: response.data.next };
             }
@@ -197,7 +202,16 @@ class TpPlugin {
         return null;
     }
 
-    async _expandPageContent(content, images, outputDir, baseURI) {
+    _addById(mapping, outName, params, ids) {
+        const paramsNoRoot = {...params};
+        delete paramsNoRoot.root;
+        ids.forEach(id => {
+            const paramsWithId = {...paramsNoRoot, ...{id}}
+            mapping[computeKey(paramsWithId)] = outName;
+        });
+    }
+
+    async _expandPageContent(content, images, baseURI) {
         const dom = new JSDOM(content);
         dom.window.document.querySelectorAll('img[src]').forEach((img) => images.push(img.src));
         dom.window.document.querySelectorAll('a[href]').forEach((link) => {
@@ -206,7 +220,11 @@ class TpPlugin {
                 link.setAttribute('href', `/${link.getAttribute('href')}`);
             }
         });
-        return dom.serialize();
+        const ids = dom.window.document.querySelectorAll('[id]');
+        return {
+            transformed: dom.serialize(),
+            ids: Array.from(ids).map((elem) => elem.getAttribute('id'))
+        };
     }
 
     async _loadMeta(path) {
