@@ -21,7 +21,8 @@ module.exports = (eleventyConfig, userOptions) => {
        * given as property value. It must return JSON. The result will be stored to the global data object under 
        * the properties name.
        */
-      data: {}
+      data: {},
+      index: null
   };
   
   const options = {...defaults, ...userOptions};

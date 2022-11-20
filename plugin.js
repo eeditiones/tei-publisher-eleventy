@@ -1,4 +1,5 @@
 const { JSDOM } = require("jsdom");
+const NODE_TYPE = require("jsdom/lib/jsdom/living/node-type");
 const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
@@ -16,13 +17,44 @@ function warn(input, ...messages) {
     console.warn(`${chalk.red('[tei-publisher]')} ${input}`, ...messages);
 }
 
+/**
+ * @typedef {Object} Context
+ * @property {string} inputPath
+ * @property {string} outputPath
+ * @property {string} baseDir
+ */
+
+/**
+ * @typedef {Object} Config - Configuration options supported by the plugin
+ * @property {string} remote
+ * @property {Object} data
+ * @property {Index} [index]
+ * @property {Number} concurrency=2
+ * @property {Number|null} limit=null
+ * @property {boolean} collections=false
+ * @property {boolean} useCache
+ * @property {boolean} disabled=false
+ */
+
+/**
+ * @typedef {Object} IndexConfig - Configuration for a field in the index
+ * @property {string} [selectors]
+ * @property {string} [exclude]
+ * @property {string} [tag]
+ * @property {boolean} allowHtml=false
+ * 
+ * @typedef {{string: IndexConfig|Function}} IndexComponent
+ * @typedef {{string: IndexComponent}} Index - Index configuration options
+ */
+
+
 class TpPlugin {
 
     /**
-     * 
-     * @param {{remote: string}} config 
+     * @param {Config} config 
      */
     constructor(config) {
+        /** @type {Config} */
         this.config = config;
         this.client = axios.create({
             baseURL: this.config.remote
@@ -75,7 +107,7 @@ class TpPlugin {
     /**
      * 
      * @param {string} content HTML content as string
-     * @param {{inputPath: string, outputPath: string}} context context of the current request
+     * @param {Context} context context of the current request
      * @returns 
      */
     async transform(content, context) {
@@ -87,6 +119,7 @@ class TpPlugin {
 
             context = createOutputDir(context);
 
+            let componentsChanged = false;
             const mapping = {};
             const mapFile = path.resolve(context.outputDir, 'index.json');
             let oldMap = {};
@@ -101,7 +134,7 @@ class TpPlugin {
                 let docPath = '';
 
                 if (!srcDoc) {
-                    warn('No src attribute set for component %s in %s', chalk.blue(component), chalk.green(context.inputPath));
+                    debug('No src attribute set for component %s in %s', chalk.blue(component), chalk.green(context.inputPath));
                     continue;
                 }
 
@@ -152,11 +185,16 @@ class TpPlugin {
                     }
                 } while(next);
                 
-                await this._loadImages(images, context.outputDir, `${this.config.remote}${docPath}`)
+                await this._loadImages(images, context.outputDir, `${this.config.remote}${docPath}`);
+
+                componentsChanged = true;
             }
 
             fs.writeFileSync(mapFile, JSON.stringify(mapping, null, 4));
 
+            if (componentsChanged) {
+                this._index(context);
+            }
         }
         return content; // no change done.
     }
@@ -174,21 +212,23 @@ class TpPlugin {
         .catch(function (error) {
             const err = error.toJSON();
             debug('Failed to retrieve fragment %s: %s', chalk.bgRed(err.config.url), err.message);
+            debug(err);
         });
 
         if (response && response.status === 200) {
             
             const outName = `${name}-${counter}.json`;
             const outFile = path.resolve(context.outputDir, outName);
+            const dom = new JSDOM(response.data.content);
             const { transformed, ids } = 
                 await this._expandPageContent(
-                    response.data.content, 
+                    dom, 
                     images, 
                     `${this.config.remote}/${docPath}`
                 );
             response.data.content = transformed;
             fs.writeFileSync(outFile, JSON.stringify(response.data, null, 4));
-            
+
             mapping[computeKey(params)] = outName;
             if (response.data.id) {
                 ids.push(response.data.id);
@@ -211,20 +251,107 @@ class TpPlugin {
         });
     }
 
-    async _expandPageContent(content, images, baseURI) {
-        const dom = new JSDOM(content);
-        dom.window.document.querySelectorAll('img[src]').forEach((img) => images.push(img.src));
-        dom.window.document.querySelectorAll('a[href]').forEach((link) => {
+    async _expandPageContent(dom, images, baseURI) {
+        const document = dom.window.document;
+        document.querySelectorAll('img[src]').forEach((img) => images.push(img.src));
+        document.querySelectorAll('a[href]').forEach((link) => {
             const url = new URL(link.href, baseURI);
             if (url.toString().startsWith(this.config.remote)) {
                 link.setAttribute('href', `/${link.getAttribute('href')}`);
             }
         });
-        const ids = dom.window.document.querySelectorAll('[id]');
+        const ids = document.querySelectorAll('[id]');
         return {
             transformed: dom.serialize(),
             ids: Array.from(ids).map((elem) => elem.getAttribute('id'))
         };
+    }
+
+    /**
+     * 
+     * @param {Context} context
+     */
+    _index(context) {
+        if (!(this.config.index)) {
+            return;
+        }
+        debug(`Indexing files in ${context.outputDir}...`);
+        const indexFile = path.join(context.baseDir, 'index.jsonl');
+        let counter = 1;
+        const indexEntry = {};
+        let foundFields;
+        do {
+            foundFields = false;
+            for (const [field, components] of Object.entries(this.config.index)) {
+                for (const [component, fieldDef] of Object.entries(components)) {
+                    const file = path.join(context.outputDir, `${component}-${counter}.json`);
+                    if (fs.existsSync(file)) {
+                        const json = JSON.parse(fs.readFileSync(file));
+                        const content = [];
+                        if (typeof fieldDef === 'function') {
+                            content.push(fieldDef.call(indexEntry, json, context.outputDir));
+                        } else {
+                            const dom = JSDOM.fragment(json.content);
+                            if (fieldDef.selectors) {
+                                dom.querySelectorAll(fieldDef.selectors).forEach((elem) => {
+                                    if (fieldDef.allowHtml) {
+                                        content.push(elem.outerHTML);
+                                    } else {
+                                        this._plainText(elem, content, fieldDef.exclude);
+                                    }
+                                });
+                            } else {
+                                if (fieldDef.allowHtml) {
+                                    content.push(dom.outerHTML);
+                                } else {
+                                    this._plainText(dom, content, fieldDef.exclude, fieldDef.allowHtml);
+                                }
+                            }
+                        }
+                        if (!indexEntry.link) {
+                            indexEntry.link = `${json.doc}?${json.id ? 'id=' : 'root='}${json.id || json.root}`;
+                        }
+                        if (fieldDef.tag) {
+                            indexEntry.tag = fieldDef.tag;
+                        }
+                        indexEntry[field] = content.join(' ').replace(/[\n\s]+/g, ' ');
+                        foundFields = true;
+                    }
+                }
+            }
+            if (foundFields) {
+                fs.writeFileSync(indexFile, JSON.stringify(indexEntry) + '\n', {
+                    flag: 'a'
+                });
+            }
+            counter += 1;
+        } while (foundFields);
+    }
+
+    /**
+     * @param {any} node
+     * @param {string[]} content 
+     * @param {string} exclude
+     */
+    _plainText(node, content, exclude = "style,script") {
+        for (let i = 0; i < node.childNodes.length; i++) {
+            const child = node.childNodes[i];
+            switch (child.nodeType) {
+                case NODE_TYPE.ELEMENT_NODE:
+                    if (!child.matches(exclude)) {
+                        this._plainText(child, content, exclude);
+                    } else {
+                        debug(`Skipping ${child}`);
+                    }
+                    break;
+                case NODE_TYPE.TEXT_NODE:
+                case NODE_TYPE.CDATA_SECTION_NODE:
+                    content.push(child.textContent);
+                    break;
+                default:
+                    break;
+            }
+        }
     }
 
     async _loadMeta(path) {
@@ -312,6 +439,7 @@ class TpPlugin {
         if (asset) {
             await asset.save(result, "json");
         }
+        console.log(result);
         return result;
     }
     
