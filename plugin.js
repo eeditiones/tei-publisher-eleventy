@@ -278,9 +278,9 @@ class TpPlugin {
         debug(`Indexing files in ${context.outputDir}...`);
         const indexFile = path.join(context.baseDir, 'index.jsonl');
         let counter = 1;
-        const indexEntry = {};
         let foundFields;
         do {
+            const indexEntry = {};
             foundFields = false;
             for (const [field, components] of Object.entries(this.config.index)) {
                 for (const [component, fieldDef] of Object.entries(components)) {
