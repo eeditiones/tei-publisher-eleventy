@@ -439,7 +439,6 @@ class TpPlugin {
         if (asset) {
             await asset.save(result, "json");
         }
-        console.log(result);
         return result;
     }
     
