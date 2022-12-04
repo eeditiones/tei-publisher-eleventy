@@ -1,5 +1,4 @@
 const { JSDOM } = require("jsdom");
-const NODE_TYPE = require("jsdom/lib/jsdom/living/node-type");
 const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
@@ -37,14 +36,7 @@ function warn(input, ...messages) {
  */
 
 /**
- * @typedef {Object} IndexConfig - Configuration for a field in the index
- * @property {string} [selectors]
- * @property {string} [exclude]
- * @property {string} [tag]
- * @property {boolean} allowHtml=false
- * 
- * @typedef {{string: IndexConfig|Function}} IndexComponent
- * @typedef {{string: IndexComponent}} Index - Index configuration options
+ * @typedef {{string: Function}} Index - Index configuration options
  */
 
 
@@ -277,79 +269,28 @@ class TpPlugin {
         }
         debug(`Indexing files in ${context.outputDir}...`);
         const indexFile = path.join(context.baseDir, 'index.jsonl');
-        let counter = 1;
-        let foundFields;
-        do {
-            const indexEntry = {};
-            foundFields = false;
-            for (const [field, components] of Object.entries(this.config.index)) {
-                for (const [component, fieldDef] of Object.entries(components)) {
-                    const file = path.join(context.outputDir, `${component}-${counter}.json`);
-                    if (fs.existsSync(file)) {
-                        const json = JSON.parse(fs.readFileSync(file));
-                        const content = [];
-                        if (typeof fieldDef === 'function') {
-                            content.push(fieldDef.call(indexEntry, json, context.outputDir));
-                        } else {
-                            const dom = JSDOM.fragment(json.content);
-                            if (fieldDef.selectors) {
-                                dom.querySelectorAll(fieldDef.selectors).forEach((elem) => {
-                                    if (fieldDef.allowHtml) {
-                                        content.push(elem.outerHTML);
-                                    } else {
-                                        this._plainText(elem, content, fieldDef.exclude);
-                                    }
-                                });
-                            } else {
-                                if (fieldDef.allowHtml) {
-                                    content.push(dom.outerHTML);
-                                } else {
-                                    this._plainText(dom, content, fieldDef.exclude, fieldDef.allowHtml);
-                                }
-                            }
+        for (const [component, indexDef] of Object.entries(this.config.index)) {
+            let counter = 1;
+            while (true) {
+                const file = path.join(context.outputDir, `${component}-${counter}.json`);
+                if (fs.existsSync(file)) {
+                    const json = JSON.parse(fs.readFileSync(file));
+                    const dom = JSDOM.fragment(json.content);
+                    if (typeof indexDef === 'function') {
+                        let entries = indexDef.call(null, dom, json, context.outputDir);
+                        if (!Array.isArray(entries)) {
+                            entries = [entries];
                         }
-                        if (!indexEntry.link) {
-                            indexEntry.link = `${json.doc}?${json.id ? 'id=' : 'root='}${json.id || json.root}`;
-                        }
-                        if (fieldDef.tag) {
-                            indexEntry.tag = fieldDef.tag;
-                        }
-                        indexEntry[field] = content.join(' ').replace(/[\n\s]+/g, ' ');
-                        foundFields = true;
+                        entries.forEach(entry => {
+                            fs.writeFileSync(indexFile, JSON.stringify(entry) + '\n', {
+                                flag: 'a'
+                            });
+                        });
                     }
+                } else {
+                    break;
                 }
-            }
-            if (foundFields) {
-                fs.writeFileSync(indexFile, JSON.stringify(indexEntry) + '\n', {
-                    flag: 'a'
-                });
-            }
-            counter += 1;
-        } while (foundFields);
-    }
-
-    /**
-     * @param {any} node
-     * @param {string[]} content 
-     * @param {string} exclude
-     */
-    _plainText(node, content, exclude = "style,script") {
-        for (let i = 0; i < node.childNodes.length; i++) {
-            const child = node.childNodes[i];
-            switch (child.nodeType) {
-                case NODE_TYPE.ELEMENT_NODE:
-                    if (!child.matches(exclude)) {
-                        this._plainText(child, content, exclude);
-                    } else {
-                        debug(`Skipping ${child}`);
-                    }
-                    break;
-                case NODE_TYPE.TEXT_NODE:
-                case NODE_TYPE.CDATA_SECTION_NODE:
-                    content.push(child.textContent);
-                    break;
-                default:
-                    break;
+                counter += 1;
             }
         }
     }
