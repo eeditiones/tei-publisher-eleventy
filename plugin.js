@@ -213,7 +213,7 @@ class TpPlugin {
             const outName = `${name}-${counter}.json`;
             const outFile = path.resolve(context.outputDir, outName);
             if (!response.data.content) {
-                debug('No content received for %s', chalk.bgRed(err.config.url));
+                debug('No content received for %s', chalk.bgRed(url));
                 return null;
             }
             const dom = new JSDOM(response.data.content);
