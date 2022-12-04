@@ -49,7 +49,10 @@ class TpPlugin {
         /** @type {Config} */
         this.config = config;
         this.client = axios.create({
-            baseURL: this.config.remote
+            baseURL: this.config.remote,
+            headers: {
+                'Accept-Encoding': 'identity'
+            }
         });
         this.queue = null;
         import('p-queue').then(({ default: PQueue }) => {
