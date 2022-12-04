@@ -205,12 +205,17 @@ class TpPlugin {
             const err = error.toJSON();
             debug('Failed to retrieve fragment %s: %s', chalk.bgRed(err.config.url), err.message);
             debug(err);
+            return null;
         });
 
         if (response && response.status === 200) {
             
             const outName = `${name}-${counter}.json`;
             const outFile = path.resolve(context.outputDir, outName);
+            if (!response.data.content) {
+                debug('No content received for %s', chalk.bgRed(err.config.url));
+                return null;
+            }
             const dom = new JSDOM(response.data.content);
             const { transformed, ids } = 
                 await this._expandPageContent(
