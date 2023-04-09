@@ -60,7 +60,11 @@ module.exports = (eleventyConfig, userOptions) => {
     const data = {};
     for (let entry of Object.entries(options.data)) {
       const fetched = await pluginInstance.fetch(entry[1]);
-      data[entry[0]] = JSON.parse(fetched);
+      try {
+        data[entry[0]] = JSON.parse(fetched);
+      } catch (e) {
+        data[entry[0]] = fetched;
+      }
     }
     return data;
   });

@@ -39,6 +39,11 @@ function warn(input, ...messages) {
  * @typedef {{string: Function}} Index - Index configuration options
  */
 
+/**
+ * @typedef {Object} Fetch - Parameters for fetching content
+ * @property {string} method
+ * @property {string} url
+ */
 
 class TpPlugin {
 
@@ -54,6 +59,7 @@ class TpPlugin {
                 'Accept-Encoding': 'identity'
             }
         });
+        log('Using base URL: %s', this.config.remote);
         this.queue = null;
         import('p-queue').then(({ default: PQueue }) => {
             this.queue = new PQueue.default({concurrency: this.config.concurrency, autoStart: true});
@@ -63,25 +69,30 @@ class TpPlugin {
     /**
      * Fetch contents of a single resource by URL.
      * 
-     * @param {string} url 
+     * @param {string|Fetch} url 
      * @returns Promise<string>
      */
     async fetch(url) {
         let asset;
         if (this.config.useCache) {
-            asset = new AssetCache(url);
+            asset = new AssetCache(url.url || url);
             if(asset.isCacheValid("1d")) {
                 // return cached data.
                 return asset.getCachedValue(); // a promise
             }
         }
 
-        debug(`Fetching ${chalk.magenta(url)}`);
-        const response = await this.client.request({
-            url,
+        debug(`Fetching ${chalk.magenta(url.url || url)}`);
+        let requestConfig = {
             method: 'get',
             responseType: 'text'
-        })
+        };
+        if (url.url) {
+            requestConfig = Object.assign(requestConfig, url);
+        } else {
+            requestConfig.url = url;
+        }
+        const response = await this.client.request(requestConfig)
         .catch(function (error) {
             const err = error.toJSON();
             debug('Failed to fetch %s: %s', chalk.bgRed(err.config.url), err.message);
@@ -351,7 +362,13 @@ class TpPlugin {
     async fetchCollections(dir) {
         const docList = [];
         if (this.config.collections) {
-            await this._fetchCollection(null, 1, dir, path.resolve(dir, 'collections'), docList);
+            if (Array.isArray(this.config.collections)) {
+                for (const coll of this.config.collections) {
+                    await this._fetchCollection(coll, 1, dir, path.resolve(dir, 'collections'), docList);        
+                }
+            } else {
+                await this._fetchCollection(null, 1, dir, path.resolve(dir, 'collections'), docList);
+            }
         }
 
         let asset;
@@ -432,9 +449,9 @@ class TpPlugin {
         const subcols = [];
         const images = Array.from(dom.querySelectorAll('img[src]'), (elem) => elem.src);
         await this._loadImages(images, outputDir, this.config.remote);
-        dom.querySelectorAll('.document a[data-collection]')
+        dom.querySelectorAll('.document-info a[data-collection]')
             .forEach(link => subcols.push(link.getAttribute('data-collection')));
-        dom.querySelectorAll('.document a:not([data-collection])')
+        dom.querySelectorAll('.document header a:not([data-collection]),.document > a:not([data-collection])')
             .forEach(link => {
                 if (link.href) {
                     if (/\.md$/.test(link.href)) {
